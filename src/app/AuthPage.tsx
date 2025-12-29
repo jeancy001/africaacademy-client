@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Eye, EyeOff, User, Mail, Lock, MapPin, Phone, Turtle } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, MapPin, Phone} from "lucide-react";
 import { africanCountries } from "../constants/Countries";
+import type { AxiosError } from "axios";
 
 interface RegisterForm {
   username: string;
@@ -26,7 +27,7 @@ interface ResetForm {
 }
 
 const AuthPage = () => {
-  const { register, login, requestCode, verifyOtp, resendOtp, resetPassword, error } = useAuth();
+  const { register, login, requestCode, verifyOtp, resendOtp, resetPassword, error, getMe } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] =useState(false)
 
@@ -95,37 +96,79 @@ const AuthPage = () => {
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true)
-    const otpCode = otp.join("");
-    if (otpCode.length !== 4) return setMessage("Veuillez entrer le code OTP complet");
-    try {
-      await verifyOtp(registerForm.email, otpCode);
-      setMessage("Compte vérifié avec succès !");
-      navigate("/"); // redirect to home page
-      setLoading(false)
-    } catch {
-      setMessage("Code OTP incorrect");
-      setLoading(false)
-    }
-  };
+const handleVerifyOtp = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setMessage(null);
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
-    setLoading(true)
-    try {
-      await login(loginForm.email, loginForm.password);
-      if(!activeTab)return setActiveTab("verify");
-      
-      navigate("/"); // redirect after login
-      setLoading(false)
-    } catch (error){
-        console.log(error)
-        setLoading(false)
+  const otpCode = otp.join("");
+
+  if (otpCode.length !== 4) {
+    setMessage("Veuillez entrer le code OTP complet");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // Use the correct email depending on the flow
+    const emailToVerify = registerForm.email || loginForm.email;
+
+    await verifyOtp(emailToVerify, otpCode, "verification");
+
+    // ✅ Runs only if OTP is valid
+    setMessage("Compte vérifié avec succès !");
+    
+    // Optionally, fetch user info again after verification
+    await getMe();
+
+    // Redirect to dashboard/home
+    navigate("/");
+  } catch (error) {
+    // ❌ OTP invalid → stay here
+    const er = error as AxiosError<{message:string}>
+    const errorMessage = er.response?.data?.message
+    setMessage(errorMessage|| "Code OTP incorrect");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+const handleLoginSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setMessage(null);
+  setLoading(true);
+
+  try {
+    // Attempt login
+    const response = await login(loginForm.email, loginForm.password);
+
+    /**
+     * login returns: { isVerified: boolean, user, token }
+     */
+    if (!response.isVerified) {
+      // Account exists but not verified → show OTP tab
+      setActiveTab("verify");
+      setMessage("Veuillez vérifier votre compte avec le code OTP envoyé par email.");
+    } else {
+      // Account verified → redirect to dashboard/home
+      navigate("/");
     }
-  };
+  } catch (error: any) {
+    // Handle unverified account specially if thrown by login
+    if (error?.type === "UNVERIFIED") {
+      setActiveTab("verify");
+      setMessage(error.message || "Veuillez vérifier votre compte avec le code OTP.");
+    } else {
+      console.log(error);
+      setMessage("Email ou mot de passe incorrect");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,18 +272,42 @@ const AuthPage = () => {
         )}
 
         {/* ---------------- OTP Verification ---------------- */}
-        {activeTab === "verify" && (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-center text-gray-700 mb-2">Entrez le code OTP envoyé à votre email</p>
-            <div className="flex justify-between space-x-2">
-              {otp.map((digit, index) => (
-                <input key={index} type="text" maxLength={1} value={digit} onChange={(e) => handleOtpChange(index, e.target.value)} ref={(el) => (otpRefs.current[index] = el)} className="w-16 h-16 text-center text-xl border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              ))}
-            </div>
-            <button type="submit" disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 mt-4">Vérifier</button>
-            <button type="button" onClick={handleResendCode} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-all duration-300 mt-2">Renvoyer le code</button>
-          </form>
-        )}
+{activeTab === "verify" && (
+  <form onSubmit={handleVerifyOtp} className="space-y-4">
+    <p className="text-center text-gray-700 mb-2">
+      Entrez le code OTP envoyé à votre email
+    </p>
+    <div className="flex justify-between space-x-2">
+      {otp.map((digit, index) => (
+        <input
+          key={index}
+          type="text"
+          maxLength={1}
+          value={digit}
+          onChange={(e) => handleOtpChange(index, e.target.value)}
+          ref={(el) => {
+            otpRefs.current[index] = el; // ✅ TypeScript-safe
+          }}
+          className="w-16 h-16 text-center text-xl border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      ))}
+    </div>
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 mt-4"
+    >
+      Vérifier
+    </button>
+    <button
+      type="button"
+      onClick={handleResendCode}
+      className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-all duration-300 mt-2"
+    >
+      Renvoyer le code
+    </button>
+  </form>
+)}
 
         {/* ---------------- Forgot Password ---------------- */}
         {activeTab === "forgot" && (

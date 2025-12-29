@@ -20,7 +20,8 @@ export interface IUser {
   username: string;
   email: string;
   profileUrl?: string;
-  role:string;
+  role: string;
+  isVerified?: boolean;
 }
 
 export interface RegisterForm {
@@ -39,7 +40,11 @@ interface IAuthContext {
   loading: boolean;
   error: string | null;
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{
+    isVerified: boolean;
+    user: IUser;
+    token: string;
+  }>;
   logout: () => Promise<void>;
   register: (data: RegisterForm) => Promise<void>;
   getMe: () => Promise<void>;
@@ -84,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (config: InternalAxiosRequestConfig) => {
         if (token) {
           config.headers = config.headers ?? {};
-          // cast headers to any to satisfy TS
           (config.headers as any).Authorization = `Bearer ${token}`;
         }
         return config;
@@ -162,33 +166,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
+
       const res = await api.post("/auth/login", { email, password });
+
+      // Save user & token in context/localStorage
       setUser(res.data.user);
       setToken(res.data.accessToken);
-    } catch (err) {
+
+      // Return verification status
+      return {
+        isVerified: res.data.user.isVerified,
+        user: res.data.user,
+        token: res.data.accessToken,
+      };
+    } catch (err: any) {
       handleError(err, "Login failed");
       setUser(null);
       setToken(null);
+
+      // If account unverified → throw specially
+      if (err.response?.status === 403) {
+        throw {
+          type: "UNVERIFIED",
+          message: err.response.data.message || "Compte non vérifié",
+        };
+      }
+
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (err) {
+      console.warn("Logout request failed:", err);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem("token");
+    }
+  };
 
-const logout = async () => {
-  try {
-    // Call backend to clear refresh token cookie
-    await api.post(`${API_URL}/auth/logout`);
-  } catch (err) {
-    console.warn("Logout request failed:", err);
-  } finally {
-    // Clear local state
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem("token");
-
-  }
-};
   const register = async (data: RegisterForm) => {
     try {
       setLoading(true);
@@ -261,11 +282,16 @@ const logout = async () => {
     }
   };
 
-  const verifyOtp = async (email: string, otpCode: string, context = "verification") => {
+  const verifyOtp = async (
+    email: string,
+    otpCode: string,
+    context = "verification"
+  ): Promise<void> => {
     try {
       await api.post("/auth/verify-otp", { email, otpCode, context });
     } catch (err) {
       handleError(err, "OTP verification failed");
+      throw err;
     }
   };
 
