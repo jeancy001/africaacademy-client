@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Eye, EyeOff, User, Mail, Lock, MapPin, Phone} from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, MapPin, Phone, Loader2} from "lucide-react";
 import { africanCountries } from "../constants/Countries";
 import type { AxiosError } from "axios";
 
@@ -251,7 +251,7 @@ const handleLoginSubmit = async (e: React.FormEvent) => {
               <input type={showPassword ? "text" : "password"} name="password" placeholder="Mot de passe" value={loginForm.password} onChange={handleLoginChange} required className="w-full pl-10 pr-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-2.5 right-3 text-gray-400">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
             </div>
-            <button type="submit" disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">{loading ? "Connexion..." : "Se connecter"}</button>
+            <button type="submit" disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">{loading ?  <Loader2 className="animate-spin mx-auto" />: "Se connecter"}</button>
             <p className="text-center text-gray-600 mt-2">Pas de compte ? <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => setActiveTab("register")}>Inscrivez-vous</span></p>
           </form>
         )}
@@ -266,7 +266,7 @@ const handleLoginSubmit = async (e: React.FormEvent) => {
             <input type="text" name="city" placeholder="Ville" value={registerForm.city} onChange={handleRegisterChange} required className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <select name="gender" value={registerForm.gender} onChange={handleRegisterChange} className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="M">Masculin</option><option value="F">Féminin</option></select>
             <div className="relative"><Phone className="absolute top-3 left-3 text-gray-400" size={18} /><input type="tel" name="tel" placeholder="Téléphone" value={registerForm.tel} onChange={handleRegisterChange} required className="w-full pl-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <button type="submit" disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">{loading ? "Enregistrement..." : "S'inscrire"}</button>
+            <button type="submit" disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300">{loading ?  <Loader2 className="animate-spin mx-auto" />: "S'inscrire"}</button>
             <p className="text-center text-gray-600 mt-2">Déjà un compte ? <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => setActiveTab("login")}>Connectez-vous</span></p>
           </form>
         )}

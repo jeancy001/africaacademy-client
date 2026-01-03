@@ -14,8 +14,16 @@ interface TeacherRoom {
   description?: string;
 }
 
-const TENANT = "vpaas-magic-cookie-203c5ced07c248b7b6c3da6d10038b93";
-const JITSI_DOMAIN = `${TENANT}.8x8.vc`;
+interface ZoomMeetingResponse {
+  meetingId: number;
+  join_url: string;
+  start_url?: string;
+  moderator: boolean;
+  role: string;
+  roomName: string;
+  topic: string;
+}
+
 const COMPANY_NAME = "BrightAfrica Academy";
 
 const SUBJECTS = [
@@ -29,17 +37,15 @@ const SUBJECTS = [
 ];
 
 const VideoMeeting: React.FC = () => {
-  const jaasRef = useRef<HTMLDivElement | null>(null);
-  const apiRef = useRef<any>(null);
-  const timerRef = useRef<number | null>(null);
-
   const { user, token, logout } = useAuth();
+  const disconnectTimer = useRef<number | null>(null);
 
   const [teacherRooms, setTeacherRooms] = useState<TeacherRoom[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [jwtToken, setJwtToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState("");
+  const [zoomMeetingData, setZoomMeetingData] =
+    useState<ZoomMeetingResponse | null>(null);
 
+  const [loading, setLoading] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [subject, setSubject] = useState("");
 
@@ -47,37 +53,30 @@ const VideoMeeting: React.FC = () => {
   const [email, setEmail] = useState(user?.email || "");
   const [avatar, setAvatar] = useState(user?.profileUrl || "");
 
-  /** ---------------- FETCH TEACHER ROOMS ---------------- */
+  // ---------------- FETCH TEACHER ROOMS ----------------
   useEffect(() => {
-    const fetchTeacherRooms = async () => {
+    if (!token) return;
+
+    const fetchRooms = async () => {
       try {
         const res = await axios.get(`${API_URL}/teacher-rooms/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data: TeacherRoom[] = res.data;
-        setTeacherRooms(data);
-        if (data.length && !selectedRoomId) setSelectedRoomId(data[0]._id);
+
+        setTeacherRooms(res.data);
+        if (res.data.length && !selectedRoomId) {
+          setSelectedRoomId(res.data[0]._id);
+        }
       } catch (err) {
-        console.error("Failed to fetch teacher rooms:", err);
+        console.error(err);
         toast.error("Unable to fetch rooms");
       }
     };
-    fetchTeacherRooms();
-  }, [token, selectedRoomId]);
 
-  /** ---------------- LOAD JITSI SCRIPT ---------------- */
-  const loadJitsiScript = () =>
-    new Promise<void>((resolve, reject) => {
-      if ((window as any).JitsiMeetExternalAPI) return resolve();
-      const script = document.createElement("script");
-      script.src = `https://${JITSI_DOMAIN}/external_api.js`;
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject("Failed to load Jitsi API");
-      document.body.appendChild(script);
-    });
+    fetchRooms();
+  }, [token]);
 
-  /** ---------------- JOIN MEETING ---------------- */
+  // ---------------- JOIN ZOOM MEETING ----------------
   const joinMeeting = async () => {
     if (!name || !email || !selectedRoomId) {
       toast.error("Missing user info or room selection");
@@ -86,111 +85,47 @@ const VideoMeeting: React.FC = () => {
 
     try {
       setLoading(true);
-      await loadJitsiScript();
 
-      const res = await axios.post(
-        `${API_URL}/jitsi/token`,
+      const res = await axios.post<ZoomMeetingResponse>(
+        `${API_URL}/zoom/token`,
         { teacherRoomId: selectedRoomId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setJwtToken(res.data.token);
+      const data = res.data;
+      setZoomMeetingData(data);
+
+      // ⏱ Auto-disconnect after 45 minutes
+      disconnectTimer.current = window.setTimeout(() => {
+        setZoomMeetingData(null);
+        toast.info("Class ended after 45 minutes");
+      }, 45 * 60 * 1000);
+
+      // 🎯 Teachers/Admins start the meeting, others join
+      const meetingUrl =
+        data.moderator && data.start_url ? data.start_url : data.join_url;
+
+      window.open(meetingUrl, "_blank");
     } catch (err) {
-      console.error("Failed to get Jitsi token:", err);
+      console.error("Failed to join Zoom meeting:", err);
       toast.error("Unable to join meeting");
     } finally {
       setLoading(false);
     }
   };
 
-  /** ---------------- INIT JITSI MEETING ---------------- */
-useEffect(() => {
-  if (!jwtToken || !jaasRef.current) return;
-  const roomObj = teacherRooms.find((r) => r._id === selectedRoomId);
-  if (!roomObj) return;
-
-  const roomName = `${TENANT}/${roomObj.roomName}`;
-  const isModerator = user?.role === "teacher" || user?.role === "admin";
-
-  const initJitsi = async () => {
-    if (apiRef.current) {
-      // Already initialized, just return
-      return;
-    }
-
+  // ---------------- LOGOUT ----------------
+  const handleLogout = async () => {
     try {
-      // Request camera and microphone
-      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    } catch {
-      toast.info("Camera disabled or microphone access required.");
+      await logout();
+    } catch (err) {
+      console.error(err);
     }
-
-    apiRef.current = new (window as any).JitsiMeetExternalAPI(JITSI_DOMAIN, {
-      roomName,
-      parentNode: jaasRef.current,
-      jwt: jwtToken,
-      width: "100%",
-      height: "100%",
-      userInfo: { displayName: name, email, avatarURL: avatar || undefined },
-      configOverwrite: {
-        prejoinPageEnabled: false,
-        enableWelcomePage: false,
-        disableDeepLinking: true,
-        startWithAudioMuted: false, // <-- allow toggling freely
-        startWithVideoMuted: false, // <-- allow toggling freely
-        enableUserRolesBasedOnToken: true,
-        enableFeaturesBasedOnToken: true,
-      },
-      interfaceConfigOverwrite: {
-        SHOW_JITSI_WATERMARK: false,
-        SHOW_BRAND_WATERMARK: false,
-        TOOLBAR_BUTTONS: isModerator
-          ? [
-              "microphone",
-              "camera",
-              "desktop",
-              "raisehand",
-              "participants-pane",
-              "chat",
-              "recording",
-              "tileview",
-              "hangup",
-            ]
-          : ["microphone", "camera", "desktop", "raisehand", "participants-pane", "chat", "tileview", "hangup"],
-      },
-    });
-
-    // Listen for Jitsi events
-    apiRef.current.addEventListener("videoConferenceJoined", () => {
-      console.log("Joined meeting successfully!");
-    });
-
-    apiRef.current.addEventListener("readyToClose", () => {
-      apiRef.current?.dispose();
-      apiRef.current = null;
-      setJwtToken(null);
-    });
-
-    // Auto end after 45 mins
-    timerRef.current = window.setTimeout(() => {
-      apiRef.current?.dispose();
-      apiRef.current = null;
-      setJwtToken(null);
-      toast.info("Class ended after 45 minutes");
-    }, 45 * 60 * 1000);
   };
 
-  initJitsi();
-
-  return () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    apiRef.current?.dispose();
-    apiRef.current = null;
-  };
-}, [jwtToken, selectedRoomId, teacherRooms, name, email, avatar, user?.role]);
-
-  /** ---------------- SUBJECT HANDLING ---------------- */
-  const handleSubjectChange = (e: ChangeEvent<HTMLInputElement>) => setSubject(e.target.value);
+  // ---------------- SUBJECT HANDLING ----------------
+  const handleSubjectChange = (e: ChangeEvent<HTMLInputElement>) =>
+    setSubject(e.target.value);
 
   const submitRequestToBecomeTeacher = async () => {
     if (!subject) return toast.error("Please select a subject");
@@ -213,14 +148,14 @@ useEffect(() => {
     }
   };
 
-  /** ---------------- LOGOUT ---------------- */
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Cleanup timer
+  useEffect(() => {
+    return () => {
+      if (disconnectTimer.current) {
+        clearTimeout(disconnectTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-100 flex flex-col">
@@ -240,13 +175,14 @@ useEffect(() => {
               Work as Freelancer
             </button>
           )}
-
           {user?.role === "admin" && (
-            <a href="/dashboard" className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+            <a
+              href="/dashboard"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            >
               Dashboard
             </a>
           )}
-
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg"
@@ -261,7 +197,7 @@ useEffect(() => {
       <div className="flex-1 flex items-center justify-center px-4">
         {user?.role === "student" ? (
           <Enrollment />
-        ) : !jwtToken ? (
+        ) : !zoomMeetingData ? (
           <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full space-y-4">
             <Input icon={User} value={name} setValue={setName} placeholder="Full name" />
             <Input icon={Mail} value={email} setValue={setEmail} placeholder="Email" />
@@ -288,7 +224,9 @@ useEffect(() => {
             </button>
           </div>
         ) : (
-          <div ref={jaasRef} className="w-full h-[90vh]" />
+          <p className="text-lg font-semibold">
+            Zoom meeting opened in a new tab
+          </p>
         )}
       </div>
 
@@ -296,10 +234,12 @@ useEffect(() => {
       {showSubjectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
           <div className="bg-white p-6 rounded-2xl w-full max-w-md relative">
-            <button onClick={() => setShowSubjectModal(false)} className="absolute top-4 right-4">
+            <button
+              onClick={() => setShowSubjectModal(false)}
+              className="absolute top-4 right-4"
+            >
               <X />
             </button>
-
             <h2 className="text-xl font-bold mb-4">Select Subject</h2>
 
             {SUBJECTS.map((s) => (
