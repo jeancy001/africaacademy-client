@@ -16,7 +16,7 @@ import { API_URL } from "../constants/Api_url";
 // Types
 // ===============================
 export interface IUser {
-  id: string;
+  _id: string;
   username: string;
   email: string;
   profileUrl?: string;

@@ -1,153 +1,154 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios, { AxiosError } from "axios";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../constants/Api_url";
 import { Loader2 } from "lucide-react";
 
+/* ===================== TYPES ===================== */
+interface Teacher {
+  _id: string;
+  name: string;
+  email: string;
+}
+
 interface TeacherRoom {
   _id: string;
-  teacher: { _id: string; name: string; email: string } | null;
+  teacher: Teacher | null;
   roomName: string;
   subject: string;
 }
 
 interface Enrollment {
   _id: string;
-  teacher: { _id: string; name: string; email: string } | null;
+  teacher: Teacher | null;
   room: TeacherRoom | null;
 }
 
+/* ===================== COMPONENT ===================== */
 function Enrollment() {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
 
   const [teacherRooms, setTeacherRooms] = useState<TeacherRoom[]>([]);
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [selectedRoom, setSelectedRoom] = useState(""); // Track room id
+  const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // 🔹 Fetch teacher rooms when token is ready
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+
+  const selectedTeacherId = useMemo(() => {
+    const room = teacherRooms.find((r) => r._id === selectedRoom);
+    return room?.teacher?._id ?? "";
+  }, [selectedRoom, teacherRooms]);
+
+  const alreadyEnrolled = useMemo(() => {
+    return enrollments.some((e) => e.teacher?._id === selectedTeacherId);
+  }, [enrollments, selectedTeacherId]);
+
+  /* ===================== FETCH TEACHER ROOMS ===================== */
   useEffect(() => {
     if (!token) return;
 
     const fetchTeacherRooms = async () => {
       try {
-        const res = await axios.get(`${API_URL}/teacher-rooms`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
+        const res = await axios.get(`${API_URL}/teacher-rooms`, { headers });
         const validRooms = res.data.filter(
           (room: TeacherRoom) => room.teacher && room.teacher._id
         );
-
         setTeacherRooms(validRooms);
-
-        if (validRooms.length > 0) {
-          setSelectedTeacher(validRooms[0].teacher!._id);
-          setSelectedRoom(validRooms[0]._id); // default selected room
-        }
+        if (validRooms.length > 0) setSelectedRoom(validRooms[0]._id);
       } catch (err) {
         console.error("Failed to fetch teacher rooms:", err);
+        setError("Failed to load teacher rooms");
       }
     };
 
     fetchTeacherRooms();
-  }, [token]);
+  }, [token, headers]);
 
-  // 🔹 Fetch student enrollments when user and token are ready
+  /* ===================== FETCH ENROLLMENTS ===================== */
+  const fetchEnrollments = async () => {
+    if (!user?._id || !token) return;
+    try {
+      const res = await axios.get(`${API_URL}/enrollments/student/${user._id}`, { headers });
+      setEnrollments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch enrollments:", err);
+      setError("Failed to load enrollments");
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!user?.id || !token) return;
-
-    const fetchEnrollments = async () => {
-      try {
-        const res = await axios.get(
-          `${API_URL}/enrollments/student/${user.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        setEnrollments(res.data);
-        console.log("Fetched enrollments:", res.data);
-      } catch (err) {
-        console.error("Failed to fetch enrollments:", err);
-      }
-    };
-
     fetchEnrollments();
-  }, [user?.id, token]);
+  }, [user?._id, token]);
 
-  // 🔹 Enroll student to teacher
+  /* ===================== ENROLL ===================== */
   const handleEnroll = async () => {
-    if (!user?.id || !selectedTeacher || !selectedRoom) {
-      console.warn("Cannot enroll: user or selections not ready");
+    if (!user?._id || !selectedRoom || !selectedTeacherId) return;
+
+    if (alreadyEnrolled) {
+      setMessage("You are already enrolled with this teacher.");
       return;
     }
 
-    console.log("Enrollment data:", {
-      studentId: user.id,
-      teacherId: selectedTeacher,
-      roomId: selectedRoom,
-    });
-
     setLoading(true);
+    setError(null);
     setMessage(null);
 
     try {
-      const res = await axios.post(
+      await axios.post(
         `${API_URL}/enrollments`,
         {
-          studentId: user.id,
-          teacherId: selectedTeacher,
+          studentId: user._id,
+          teacherId: selectedTeacherId,
           roomId: selectedRoom,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
 
-      console.log("Enrollment response:", res.data);
-
-      await axios.get(`${API_URL}/enrollments/student/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => setEnrollments(res.data));
-
+      await fetchEnrollments();
       setMessage("Enrolled successfully!");
+      // ❌ Do NOT navigate automatically
     } catch (err) {
       const error = err as AxiosError<{ message: string }>;
-      console.error("Enrollment failed:", error.response?.data);
-      setMessage(error.response?.data?.message || "Enrollment failed");
+      setError(error.response?.data?.message || "Enrollment failed");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔹 Render loading if user not ready
-  if (!user || !token) {
-    return <p className="p-6">Loading user info...</p>;
-  }
+  /* ===================== GUARDS ===================== */
+  if (!user || !token) return <p className="p-6">Loading user info...</p>;
+  if (initialLoading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin w-8 h-8 text-indigo-600" />
+      </div>
+    );
 
+  /* ===================== UI ===================== */
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-100 p-6 flex flex-col md:flex-row gap-6">
-      {/* Enrollment Form */}
+      {/* ENROLL FORM */}
       <div className="w-full md:w-1/3 bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-5">
-        <h2 className="text-2xl font-bold text-indigo-700">
-          Enroll in a Class
-        </h2>
+        <h2 className="text-2xl font-bold text-indigo-700">Enroll in a Class</h2>
 
         <select
           value={selectedRoom}
-          onChange={(e) => {
-            const room = teacherRooms.find((r) => r._id === e.target.value);
-            if (room && room.teacher) {
-              setSelectedRoom(room._id);
-              setSelectedTeacher(room.teacher._id);
-            }
-          }}
+          onChange={(e) => setSelectedRoom(e.target.value)}
           className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
         >
           {teacherRooms.map(
             (room) =>
               room.teacher && (
                 <option key={room._id} value={room._id}>
-                  {room.teacher.name} – {room.subject}
+                  {room.teacher.name} — {room.subject}
                 </option>
               )
           )}
@@ -155,27 +156,52 @@ function Enrollment() {
 
         <button
           onClick={handleEnroll}
-          disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl flex justify-center items-center gap-2"
+          disabled={loading || alreadyEnrolled}
+          className={`w-full font-semibold py-3 rounded-xl flex justify-center items-center gap-2
+            ${
+              alreadyEnrolled
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
         >
-          {loading ? <Loader2 className="animate-spin w-5 h-5" /> : "Enroll Now"}
+          {loading ? (
+            <Loader2 className="animate-spin w-5 h-5" />
+          ) : alreadyEnrolled ? (
+            "Already Enrolled"
+          ) : (
+            "Enroll Now"
+          )}
         </button>
 
-        {message && (
-          <p className="text-sm font-medium text-green-600">{message}</p>
+        {message && <p className="text-sm font-medium text-green-600">{message}</p>}
+        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+        {/* ✅ Show dashboard & meetings buttons if user has any enrollment */}
+        {enrollments.length > 0 && (
+          <div className="flex flex-col gap-3 mt-2">
+            <button
+              onClick={() => navigate("/studentdash")}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl"
+            >
+              Go to Dashboard
+            </button>
+
+            <button
+              onClick={() => navigate("/meetings")}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl"
+            >
+              Go to Meetings
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Enrolled Classes */}
+      {/* ENROLLED CLASSES */}
       <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-auto">
-        <h2 className="text-2xl font-bold text-indigo-700 mb-4">
-          My Enrolled Classes
-        </h2>
+        <h2 className="text-2xl font-bold text-indigo-700 mb-4">My Enrolled Classes</h2>
 
         {enrollments.length === 0 ? (
-          <p className="text-gray-500">
-            You are not enrolled in any classes yet.
-          </p>
+          <p className="text-gray-500">You are not enrolled in any classes yet.</p>
         ) : (
           <ul className="space-y-4">
             {enrollments.map(

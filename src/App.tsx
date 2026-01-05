@@ -6,6 +6,7 @@ import ProtectedRoute from "./app/ProtectRoutes";
 import AuthPage from "./app/AuthPage";
 import VideoMeeting from "./components/VideoMeetings";
 import DashBoard from "./dash/DashBoard";
+import { Studentdash } from "./dash/students/StudentDash";
 
 function App() {
   const { user,token } = useAuth();
@@ -34,7 +35,9 @@ function App() {
       />
 
       {/* Optional: fallback 404 */}
-      <Route path="*" element={<Navigate to={user && token ? "/" : "/register"} replace />} />
+      <Route path="*" element={<Navigate to={user && token ? "/" : "/register"} replace />}
+       />
+       <Route path="/studentdash" element={  <ProtectedRoute> <Studentdash/> </ProtectedRoute>} />
     </Routes>
   );
 }

@@ -1,10 +1,21 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { User, Mail, Image, Loader2, LogOutIcon, X } from "lucide-react";
+import { useEffect, useRef, useState,type ChangeEvent } from "react";
+import {
+  User,
+  Mail,
+  Image,
+  Loader2,
+  LogOutIcon,
+  X,
+  BookOpen,
+  Video,
+  CalendarCheck,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../constants/Api_url";
 import axios, { AxiosError } from "axios";
 import Enrollment from "./Enrollment";
 import { toast, ToastContainer } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
 interface TeacherRoom {
   _id: string;
@@ -24,6 +35,12 @@ interface ZoomMeetingResponse {
   topic: string;
 }
 
+interface EnrollmentType {
+  _id: string;
+  teacher: { _id: string; name: string; email: string } | null;
+  room: TeacherRoom | null;
+}
+
 const COMPANY_NAME = "BrightAfrica Academy";
 
 const SUBJECTS = [
@@ -39,16 +56,15 @@ const SUBJECTS = [
 const VideoMeeting: React.FC = () => {
   const { user, token, logout } = useAuth();
   const disconnectTimer = useRef<number | null>(null);
+  const navigate = useNavigate();
 
   const [teacherRooms, setTeacherRooms] = useState<TeacherRoom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
-  const [zoomMeetingData, setZoomMeetingData] =
-    useState<ZoomMeetingResponse | null>(null);
-
+  const [zoomMeetingData, setZoomMeetingData] = useState<ZoomMeetingResponse | null>(null);
+  const [enrollments, setEnrollments] = useState<EnrollmentType[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [subject, setSubject] = useState("");
-
   const [name, setName] = useState(user?.username || "");
   const [email, setEmail] = useState(user?.email || "");
   const [avatar, setAvatar] = useState(user?.profileUrl || "");
@@ -62,19 +78,33 @@ const VideoMeeting: React.FC = () => {
         const res = await axios.get(`${API_URL}/teacher-rooms/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         setTeacherRooms(res.data);
-        if (res.data.length && !selectedRoomId) {
-          setSelectedRoomId(res.data[0]._id);
-        }
+        if (res.data.length && !selectedRoomId) setSelectedRoomId(res.data[0]._id);
       } catch (err) {
         console.error(err);
         toast.error("Unable to fetch rooms");
       }
     };
-
     fetchRooms();
   }, [token]);
+
+  // ---------------- FETCH ENROLLMENTS ----------------
+  useEffect(() => {
+    if (!token || !user?._id) return;
+
+    const fetchEnrollments = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/enrollments/student/${user._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setEnrollments(res.data);
+      } catch (err) {
+        console.error(err);
+        toast.error("Unable to fetch your enrollments");
+      }
+    };
+    fetchEnrollments();
+  }, [token, user?._id]);
 
   // ---------------- JOIN ZOOM MEETING ----------------
   const joinMeeting = async () => {
@@ -85,26 +115,20 @@ const VideoMeeting: React.FC = () => {
 
     try {
       setLoading(true);
-
       const res = await axios.post<ZoomMeetingResponse>(
         `${API_URL}/zoom/token`,
         { teacherRoomId: selectedRoomId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       const data = res.data;
       setZoomMeetingData(data);
 
-      // ⏱ Auto-disconnect after 45 minutes
       disconnectTimer.current = window.setTimeout(() => {
         setZoomMeetingData(null);
         toast.info("Class ended after 45 minutes");
       }, 45 * 60 * 1000);
 
-      // 🎯 Teachers/Admins start the meeting, others join
-      const meetingUrl =
-        data.moderator && data.start_url ? data.start_url : data.join_url;
-
+      const meetingUrl = data.moderator && data.start_url ? data.start_url : data.join_url;
       window.open(meetingUrl, "_blank");
     } catch (err) {
       console.error("Failed to join Zoom meeting:", err);
@@ -124,8 +148,7 @@ const VideoMeeting: React.FC = () => {
   };
 
   // ---------------- SUBJECT HANDLING ----------------
-  const handleSubjectChange = (e: ChangeEvent<HTMLInputElement>) =>
-    setSubject(e.target.value);
+  const handleSubjectChange = (e: ChangeEvent<HTMLInputElement>) => setSubject(e.target.value);
 
   const submitRequestToBecomeTeacher = async () => {
     if (!subject) return toast.error("Please select a subject");
@@ -151,84 +174,142 @@ const VideoMeeting: React.FC = () => {
   // Cleanup timer
   useEffect(() => {
     return () => {
-      if (disconnectTimer.current) {
-        clearTimeout(disconnectTimer.current);
-      }
+      if (disconnectTimer.current) clearTimeout(disconnectTimer.current);
     };
   }, []);
 
+  const isEnrolled = enrollments.length > 0;
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-100 flex flex-col">
-      {/* HEADER */}
-      <header className="w-full flex items-center justify-between px-6 py-5 bg-white/70 backdrop-blur-md shadow-sm">
-        <div className="flex items-center gap-4">
-          <img src="/logo.png" className="h-20" />
-          <span className="text-2xl font-extrabold">{COMPANY_NAME}</span>
-        </div>
+{/* HEADER */}
+{/* HEADER */}
+<header className="w-full bg-white/90 backdrop-blur-md shadow-md sticky top-0 z-50">
+  <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-4 gap-3 sm:gap-0">
+    
+    {/* LOGO AND BRAND */}
+    <div className="flex items-center gap-3">
+      <img src="/logo.png" alt="Logo" className="h-12 sm:h-16 w-auto" />
+      <span className="text-xl sm:text-2xl font-extrabold text-indigo-700">
+        {COMPANY_NAME}
+      </span>
+    </div>
 
-        <div className="flex items-center gap-4">
-          {user?.role !== "teacher" && (
+    {/* ACTION BUTTONS */}
+    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 sm:mt-0 justify-center sm:justify-end w-full sm:w-auto">
+      {user?.role !== "teacher" && (
+        <button
+          onClick={() => setShowSubjectModal(true)}
+          className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-2 bg-indigo-600 text-white text-sm sm:text-base rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          Work as Freelancer
+        </button>
+      )}
+
+      {user?.role === "admin" && (
+        <a
+          href="/dashboard"
+          className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Dashboard
+        </a>
+      )}
+
+      <button
+        onClick={handleLogout}
+        className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-red-500 text-white text-sm sm:text-base rounded-lg hover:bg-red-600 transition-colors"
+      >
+        <LogOutIcon size={16} className="sm:w-4 sm:h-4" />
+        <span>Logout</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+
+      {/* MAIN DASHBOARD */}
+      <main className="flex-1 p-6 flex flex-col md:flex-row gap-6">
+        {/* LEFT PANEL: STUDENT DASHBOARD */}
+        <div className="md:w-1/4 bg-white rounded-2xl shadow-lg p-6 space-y-6">
+          <div className="flex flex-col items-center text-center gap-2">
+            <img
+              src={avatar || "/default-avatar.png"}
+              alt="Avatar"
+              className="w-20 h-20 rounded-full border-2 border-indigo-600"
+            />
+            <h3 className="text-xl font-bold">{name}</h3>
+            <p className="text-gray-500">{email}</p>
+          </div>
+
+          <div className="space-y-3">
             <button
-              onClick={() => setShowSubjectModal(true)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg"
+              onClick={() => navigate("/studentdash")}
+              className="flex items-center gap-2 w-full px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700"
             >
-              Work as Freelancer
+              <BookOpen size={20} />
+              My Dashboard
             </button>
-          )}
-          {user?.role === "admin" && (
-            <a
-              href="/dashboard"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-            >
-              Dashboard
-            </a>
-          )}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg"
-          >
-            <LogOutIcon size={18} />
-            Logout
-          </button>
-        </div>
-      </header>
-
-      {/* MAIN */}
-      <div className="flex-1 flex items-center justify-center px-4">
-        {user?.role === "student" ? (
-          <Enrollment />
-        ) : !zoomMeetingData ? (
-          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full space-y-4">
-            <Input icon={User} value={name} setValue={setName} placeholder="Full name" />
-            <Input icon={Mail} value={email} setValue={setEmail} placeholder="Email" />
-            <Input icon={Image} value={avatar} setValue={setAvatar} placeholder="Avatar URL" />
-
-            <select
-              value={selectedRoomId}
-              onChange={(e) => setSelectedRoomId(e.target.value)}
-              className="w-full border rounded-lg p-3"
-            >
-              {teacherRooms.map((room) => (
-                <option key={room._id} value={room._id}>
-                  {room.roomName} – {room.teacher.name} ({room.subject})
-                </option>
-              ))}
-            </select>
 
             <button
-              onClick={joinMeeting}
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl"
+              onClick={() => navigate("/meetings")}
+              className="flex items-center gap-2 w-full px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
             >
-              {loading ? <Loader2 className="animate-spin mx-auto" /> : "Join Class"}
+              <Video size={20} />
+              My Classes
+            </button>
+
+            <button
+              onClick={() => navigate("/enrollments")}
+              className="flex items-center gap-2 w-full px-4 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600"
+            >
+              <CalendarCheck size={20} />
+              Enroll in Class
             </button>
           </div>
-        ) : (
-          <p className="text-lg font-semibold">
-            Zoom meeting opened in a new tab
-          </p>
-        )}
-      </div>
+        </div>
+
+        {/* RIGHT PANEL: CONTENT */}
+        <div className="flex-1">
+          {!isEnrolled ? (
+            <Enrollment />
+          ) : !zoomMeetingData ? (
+            <div className="bg-white p-8 rounded-3xl shadow-xl max-w-xl w-full space-y-4 mx-auto">
+              <h2 className="text-2xl font-bold text-indigo-700 mb-4 text-center">
+                Join Your Class
+              </h2>
+
+              <Input icon={User} value={name} setValue={setName} placeholder="Full name" />
+              <Input icon={Mail} value={email} setValue={setEmail} placeholder="Email" />
+              <Input icon={Image} value={avatar} setValue={setAvatar} placeholder="Avatar URL" />
+
+              <select
+                value={selectedRoomId}
+                onChange={(e) => setSelectedRoomId(e.target.value)}
+                className="w-full border rounded-lg p-3 mt-2"
+              >
+                {teacherRooms.map((room) => (
+                  <option key={room._id} value={room._id}>
+                    {room.roomName} – {room.teacher.name} ({room.subject})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={joinMeeting}
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl mt-4 hover:bg-indigo-700"
+              >
+                {loading ? <Loader2 className="animate-spin mx-auto" /> : "Join Class"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-lg font-semibold text-center text-indigo-600">
+              Zoom meeting opened in a new tab
+            </p>
+          )}
+        </div>
+      </main>
 
       {/* SUBJECT MODAL */}
       {showSubjectModal && (
