@@ -27,7 +27,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         {/* BRAND */}
         <div className="flex items-center gap-3">
           <img
-            src="/logo.png"
+            src="/new_logo.png"
             alt="Bright Africa Academy Logo"
             className="h-12 sm:h-16 w-auto object-contain"
           />
