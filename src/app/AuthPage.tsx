@@ -205,7 +205,7 @@ const handleLoginSubmit = async (e: React.FormEvent) => {
     <div className="min-h-screen flex flex-col md:flex-row items-center justify-center bg-gray-100 p-4">
       {/* Logo + Description */}
       <div className="flex flex-col items-center md:items-start mb-6 md:mb-0 md:mr-10">
-        <img src="/logo.png" alt="BrightAfrica Academy" className="w-32 h-32 mb-4" />
+        <img src="/new_logo.png" alt="BrightAfrica Academy" className="w-32 h-32 mb-4" />
         <h1 className="text-3xl font-bold text-gray-800">Okapi Junior Academia</h1>
         <p className="text-gray-600 mt-2 text-center md:text-left max-w-xs">
           Rejoignez notre communauté d'apprentissage et développez vos compétences numériques à travers l'Afrique.
