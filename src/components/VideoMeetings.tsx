@@ -47,7 +47,7 @@ interface EnrollmentType {
 /*                                  CONSTANTS                                 */
 /* -------------------------------------------------------------------------- */
 
-const COMPANY_NAME = "BrightAfrica Academy";
+const COMPANY_NAME = "Okapi Junior Academia.";
 const TEACHER_FEE = 50;
 
 const SUBJECTS = [
