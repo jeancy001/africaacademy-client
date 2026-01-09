@@ -68,7 +68,7 @@ const AuthContext = createContext<IAuthContext | undefined>(undefined);
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
-  timeout: 10000,
+  timeout: 30000, 
 });
 
 /* =============================== */
