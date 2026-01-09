@@ -1,6 +1,5 @@
 // Enrollment.tsx
 import { useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import axios, { AxiosError } from "axios";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../constants/Api_url";
@@ -19,7 +18,6 @@ const api = axios.create({ baseURL: API_URL, timeout: 8000 });
 /* ===================== COMPONENT ===================== */
 function Enrollment() {
   const { user, token } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [selectedRoom, setSelectedRoom] = useState("");
