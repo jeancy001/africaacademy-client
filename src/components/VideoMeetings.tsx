@@ -114,7 +114,7 @@ const VideoMeeting: React.FC = () => {
       })
       .then((res) => setEnrollments(res.data))
       .catch(() => toast.error("Unable to fetch enrollments"));
-  }, [token, user?._id]);
+  }, [token, user?._id, enrollments]);
 
   /* -------------------------------------------------------------------------- */
   /*                               JOIN MEETING                                 */
@@ -160,7 +160,7 @@ useEffect(() => {
   return () => {
     document.body.style.overflow = "auto";
   };
-}, [showSubjectModal]);
+}, [showSubjectModal,enrollments]);
 
   /* -------------------------------------------------------------------------- */
   /*                              PAYMENT SUCCESS                               */

@@ -15,7 +15,7 @@ function App() {
   const { user,token } = useAuth();
   return (
     <>
-            <AdvertHeader
+   <AdvertHeader
   message="🎓 New term started! Enroll now and join live classes with expert teachers."
   ctaText="Enroll Today"
   ctaLink="/enrollments"

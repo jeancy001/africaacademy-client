@@ -2,19 +2,17 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import axios, {
-  type AxiosError,
-  type InternalAxiosRequestConfig,
-} from "axios";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_URL } from "../constants/Api_url";
 
-// ===============================
-// Types
-// ===============================
+/* =============================== */
+/* TYPES */
+/* =============================== */
+
 export interface IUser {
   _id: string;
   username: string;
@@ -40,128 +38,166 @@ interface IAuthContext {
   loading: boolean;
   error: string | null;
 
-  login: (email: string, password: string) => Promise<{
-    isVerified: boolean;
-    user: IUser;
-    token: string;
-  }>;
+  login: (email: string, password: string) => Promise<any>;
   logout: () => Promise<void>;
   register: (data: RegisterForm) => Promise<void>;
   getMe: () => Promise<void>;
 
   updateProfile: (data: Record<string, any>) => Promise<void>;
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updatePassword: (current: string, next: string) => Promise<void>;
 
   requestCode: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
-  verifyOtp: (email: string, otpCode: string, context?: string) => Promise<void>;
+  verifyOtp: (email: string, otp: string, context?: string) => Promise<void>;
   resendOtp: (email: string, context?: string) => Promise<void>;
 
   getProfiles: () => Promise<IUser[]>;
   deleteProfile: () => Promise<void>;
 }
 
-// ===============================
-// Context
-// ===============================
+/* =============================== */
+/* CONTEXT */
+/* =============================== */
+
 const AuthContext = createContext<IAuthContext | undefined>(undefined);
 
-// ===============================
-// Provider
-// ===============================
+/* =============================== */
+/* AXIOS SINGLETON */
+/* =============================== */
+
+const api = axios.create({
+  baseURL: API_URL,
+  withCredentials: true,
+  timeout: 10000,
+});
+
+/* =============================== */
+/* PROVIDER */
+/* =============================== */
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<IUser | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token") || null);
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem("token")
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ===============================
-  // Axios instance
-  // ===============================
-  const api = useMemo(() => {
-    const instance = axios.create({
-      baseURL: API_URL,
-      withCredentials: true, // send refresh token cookie
-    });
+  const refreshInProgress = useRef(false);
+  const channel = useRef<BroadcastChannel | null>(null);
 
-    // Attach access token
-    instance.interceptors.request.use(
+  /* =============================== */
+  /* BROADCAST CHANNEL (REAL TIME) */
+  /* =============================== */
+
+  useEffect(() => {
+    channel.current = new BroadcastChannel("auth_channel");
+    channel.current.onmessage = (event) => {
+      if (event.data.type === "TOKEN_UPDATE") {
+        setToken(event.data.token);
+      }
+      if (event.data.type === "LOGOUT") {
+        setUser(null);
+        setToken(null);
+      }
+    };
+    return () => channel.current?.close();
+  }, []);
+
+  /* =============================== */
+  /* REQUEST INTERCEPTOR */
+  /* =============================== */
+
+  useEffect(() => {
+    const reqId = api.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         if (token) {
-          config.headers = config.headers ?? {};
-          (config.headers as any).Authorization = `Bearer ${token}`;
+          config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
-      },
-      (err) => Promise.reject(err)
+      }
     );
 
-    // Response interceptor to handle 401 + refresh token
-    instance.interceptors.response.use(
+    const resId = api.interceptors.response.use(
       (res) => res,
       async (err: AxiosError) => {
-        const originalRequest = err.config as InternalAxiosRequestConfig & { _retry?: boolean };
-        if (err.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
+        const original = err.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+        if (
+          err.response?.status === 401 &&
+          !original._retry &&
+          !refreshInProgress.current
+        ) {
+          original._retry = true;
+          refreshInProgress.current = true;
+
           try {
             const refreshRes = await axios.post(
               `${API_URL}/auth/refresh-token`,
               {},
               { withCredentials: true }
             );
-            const newAccessToken = refreshRes.data.accessToken;
-            setToken(newAccessToken);
 
-            originalRequest.headers = originalRequest.headers ?? {};
-            (originalRequest.headers as any).Authorization = `Bearer ${newAccessToken}`;
+            const newToken = refreshRes.data.accessToken;
+            setToken(newToken);
+            localStorage.setItem("token", newToken);
+            channel.current?.postMessage({
+              type: "TOKEN_UPDATE",
+              token: newToken,
+            });
 
-            return instance(originalRequest);
+            original.headers.Authorization = `Bearer ${newToken}`;
+            return api(original);
           } catch {
             await logout();
+          } finally {
+            refreshInProgress.current = false;
           }
         }
+
         return Promise.reject(err);
       }
     );
 
-    return instance;
+    return () => {
+      api.interceptors.request.eject(reqId);
+      api.interceptors.response.eject(resId);
+    };
   }, [token]);
 
-  // ===============================
-  // Persist access token
-  // ===============================
+  /* =============================== */
+  /* TOKEN PERSISTENCE */
+  /* =============================== */
+
   useEffect(() => {
-    if (token) {
-      localStorage.setItem("token", token);
-    } else {
+    if (!token) {
       localStorage.removeItem("token");
       setUser(null);
     }
   }, [token]);
 
-  // ===============================
-  // Fetch current user
-  // ===============================
-  useEffect(() => {
-    if (token && !user) {
-      getMe();
-    }
-  }, [token]);
+  /* =============================== */
+  /* GET CURRENT USER */
+  /* =============================== */
 
-  // ===============================
-  // Helpers
-  // ===============================
-  const handleError = (err: unknown, fallback: string) => {
-    if (axios.isAxiosError(err)) {
-      setError(err.response?.data?.message || fallback);
-    } else {
-      setError(fallback);
+  const getMe = async () => {
+    try {
+      const res = await api.get("/auth/me");
+      setUser(res.data.user);
+    } catch {
+      setUser(null);
+      setToken(null);
     }
   };
 
-  // ===============================
-  // Auth functions
-  // ===============================
+  useEffect(() => {
+    if (token && !user) getMe();
+  }, [token]);
+
+  /* =============================== */
+  /* AUTH METHODS */
+  /* =============================== */
+
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
@@ -169,29 +205,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const res = await api.post("/auth/login", { email, password });
 
-      // Save user & token in context/localStorage
       setUser(res.data.user);
       setToken(res.data.accessToken);
-
-      // Return verification status
-      return {
-        isVerified: res.data.user.isVerified,
-        user: res.data.user,
+      localStorage.setItem("token", res.data.accessToken);
+      channel.current?.postMessage({
+        type: "TOKEN_UPDATE",
         token: res.data.accessToken,
-      };
+      });
+
+      return res.data;
     } catch (err: any) {
-      handleError(err, "Login failed");
-      setUser(null);
-      setToken(null);
-
-      // If account unverified → throw specially
-      if (err.response?.status === 403) {
-        throw {
-          type: "UNVERIFIED",
-          message: err.response.data.message || "Compte non vérifié",
-        };
-      }
-
+      setError(err.response?.data?.message || "Login failed");
       throw err;
     } finally {
       setLoading(false);
@@ -201,127 +225,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       await api.post("/auth/logout");
-    } catch (err) {
-      console.warn("Logout request failed:", err);
-    } finally {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem("token");
-    }
+    } catch {}
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("token");
+    channel.current?.postMessage({ type: "LOGOUT" });
   };
 
   const register = async (data: RegisterForm) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await api.post("/auth/register", data);
-    } catch (err) {
-      handleError(err, "Registration failed");
-    } finally {
-      setLoading(false);
-    }
+    await api.post("/auth/register", data);
   };
 
-  const getMe = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/auth/me");
-      setUser(res.data.user);
-    } catch {
-      setUser(null);
-      setToken(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* =============================== */
+  /* PROFILE / PASSWORD */
+  /* =============================== */
 
-  // ===============================
-  // Profile & Password
-  // ===============================
   const updateProfile = async (data: Record<string, any>) => {
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => formData.append(key, value as any));
-      const res = await api.put("/auth/update-profile", formData);
-      setUser(res.data.user);
-    } catch (err) {
-      handleError(err, "Update profile failed");
-    } finally {
-      setLoading(false);
-    }
+    const form = new FormData();
+    Object.entries(data).forEach(([k, v]) => form.append(k, v as any));
+    const res = await api.put("/auth/update-profile", form);
+    setUser(res.data.user);
   };
 
-  const updatePassword = async (currentPassword: string, newPassword: string) => {
-    try {
-      setLoading(true);
-      await api.put("/auth/update-password", { currentPassword, newPassword });
-    } catch (err) {
-      handleError(err, "Update password failed");
-    } finally {
-      setLoading(false);
-    }
+  const updatePassword = async (current: string, next: string) => {
+    await api.put("/auth/update-password", { currentPassword: current, newPassword: next });
   };
 
-  // ===============================
-  // OTP functions
-  // ===============================
+  /* =============================== */
+  /* OTP */
+  /* =============================== */
+
   const requestCode = async (email: string) => {
-    try {
-      await api.post("/auth/request-code", { email });
-    } catch (err) {
-      handleError(err, "Request code failed");
-    }
+    await api.post("/auth/request-code", { email });
   };
 
   const resetPassword = async (email: string, code: string, newPassword: string) => {
-    try {
-      await api.post("/auth/reset-password", { email, code, newPassword });
-    } catch (err) {
-      handleError(err, "Reset password failed");
-    }
+    await api.post("/auth/reset-password", { email, code, newPassword });
   };
 
-  const verifyOtp = async (
-    email: string,
-    otpCode: string,
-    context = "verification"
-  ): Promise<void> => {
-    try {
-      await api.post("/auth/verify-otp", { email, otpCode, context });
-    } catch (err) {
-      handleError(err, "OTP verification failed");
-      throw err;
-    }
+  const verifyOtp = async (email: string, otp: string, context = "verification") => {
+    await api.post("/auth/verify-otp", { email, otpCode: otp, context });
   };
 
   const resendOtp = async (email: string, context = "verification") => {
-    try {
-      await api.post("/auth/resend-otp", { email, context });
-    } catch (err) {
-      handleError(err, "Resend OTP failed");
-    }
+    await api.post("/auth/resend-otp", { email, context });
   };
 
-  // ===============================
-  // Admin / Profiles
-  // ===============================
-  const getProfiles = async (): Promise<IUser[]> => {
-    try {
-      const res = await api.get("/auth/profiles");
-      return res.data.users;
-    } catch (err) {
-      handleError(err, "Get profiles failed");
-      return [];
-    }
+  /* =============================== */
+  /* ADMIN */
+  /* =============================== */
+
+  const getProfiles = async () => {
+    const res = await api.get("/auth/profiles");
+    return res.data.users;
   };
 
   const deleteProfile = async () => {
-    try {
-      await api.delete("/auth/delete");
-    } catch (err) {
-      handleError(err, "Delete profile failed");
-    }
+    await api.delete("/auth/delete");
   };
 
   return (
@@ -350,9 +310,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// ===============================
-// Hook
-// ===============================
+/* =============================== */
+/* HOOK */
+/* =============================== */
+
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

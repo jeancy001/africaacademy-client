@@ -1,5 +1,6 @@
 import { LogOutIcon, Briefcase, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AppHeaderProps {
   companyName: string;
@@ -10,11 +11,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   companyName,
   onOpenFreelancerModal,
 }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const queryClient = useQueryClient();
 
   const handleLogout = async () => {
     try {
       await logout();
+      // Clear cached user data immediately
+      queryClient.setQueryData(["me"], null);
     } catch (err) {
       console.error("Logout failed", err);
     }
@@ -40,7 +44,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
           
           {/* Freelancer */}
-          {user?.role !== "teacher" && onOpenFreelancerModal && (
+          {token && user?.role !== "teacher" && onOpenFreelancerModal && (
             <button
               onClick={onOpenFreelancerModal}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-medium hover:bg-indigo-700 transition"
@@ -51,7 +55,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           )}
 
           {/* Admin Dashboard */}
-          {user?.role === "admin" && (
+          {token && user?.role === "admin" && (
             <a
               href="/dashboard"
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm sm:text-base font-medium hover:bg-blue-700 transition"
@@ -62,13 +66,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           )}
 
           {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm sm:text-base font-medium hover:bg-red-600 transition"
-          >
-            <LogOutIcon size={18} />
-            Logout
-          </button>
+          {token && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm sm:text-base font-medium hover:bg-red-600 transition"
+            >
+              <LogOutIcon size={18} />
+              Logout
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, token, loading } = useAuth();
   const location = useLocation();
 
   // While user info is loading, show nothing or a loader
@@ -17,7 +17,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // Not authenticated → redirect to register
-  if (!user) {
+  if (!user || !token) {
     return <Navigate to="/register" state={{ from: location }} replace />;
   }
 

@@ -1,1 +1,5 @@
-export const API_URL="https://africaacademy-server.vercel.app/api/v1"
+const isLocal = true; // or false
+
+export const API_URL = isLocal
+  ? "http://localhost:5000/api/v1"
+  : "https://africaacademy-server.vercel.app/api/v1";

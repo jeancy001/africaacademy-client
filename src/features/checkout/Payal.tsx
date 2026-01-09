@@ -1,65 +1,74 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ProductsDetails {
   value: string;
   description: string;
-  onSuccess?: () => void; // Add optional onSuccess callback
+  onSuccess?: () => void;
 }
 
 declare global {
   interface Window {
-    paypal: any;
+    paypal?: any;
   }
 }
 
 function Paypal({ value, description, onSuccess }: ProductsDetails) {
   const paypalRef = useRef<HTMLDivElement>(null);
+  const buttonsRef = useRef<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
+  // Wait until PayPal SDK is loaded
   useEffect(() => {
-    if (!window.paypal) return;
+    const interval = setInterval(() => {
+      if (window.paypal) {
+        setLoaded(true);
+        clearInterval(interval);
+      }
+    }, 50);
 
-    window.paypal
-      .Buttons({
-        createOrder: (data: unknown, actions: any) => {
-          console.log(data)
-          return actions.order.create({
-            intent: "CAPTURE",
-            purchase_units: [
-              {
-                description,
-                amount: {
-                  currency_code: "USD",
-                  value,
-                },
-              },
-            ],
-          });
-        },
+    return () => clearInterval(interval);
+  }, []);
 
-        onApprove: async (data: any, actions: any) => {
-          console.log(data)
-          try {
-            const order = await actions.order.capture();
-            console.log("Payment successful:", order);
+  // Render PayPal buttons once
+  useEffect(() => {
+    if (!loaded || !paypalRef.current || buttonsRef.current) return;
 
-            // Call the parent's onSuccess function if provided
-            if (onSuccess) onSuccess();
-          } catch (err) {
-            console.error("Error capturing order:", err);
-          }
-        },
+    buttonsRef.current = window.paypal.Buttons({
+      style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
 
-        onError: (err: any) => {
-          console.error("PayPal error:", err);
-        },
-      })
-      .render(paypalRef.current);
+      createOrder: (_data: any, actions: any) => {
+        // Use the latest value/description dynamically
+        return actions.order.create({
+          intent: "CAPTURE",
+          purchase_units: [
+            {
+              description,
+              amount: { currency_code: "USD", value },
+            },
+          ],
+        });
+      },
 
-    // Cleanup PayPal buttons when component unmounts
+      onApprove: async (_data: any, actions: any) => {
+        try {
+          const order = await actions.order.capture();
+          console.log("Payment successful:", order);
+          if (onSuccess) onSuccess();
+        } catch (err) {
+          console.error("Error capturing order:", err);
+        }
+      },
+
+      onError: (err: any) => console.error("PayPal error:", err),
+    });
+
+    buttonsRef.current.render(paypalRef.current);
+
     return () => {
       if (paypalRef.current) paypalRef.current.innerHTML = "";
+      buttonsRef.current = null;
     };
-  }, [value, description, onSuccess]);
+  }, [loaded]);
 
   return <div ref={paypalRef}></div>;
 }
