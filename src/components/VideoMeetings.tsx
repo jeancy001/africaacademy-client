@@ -52,12 +52,29 @@ const TEACHER_FEE = 50;
 
 const SUBJECTS = [
   "Mathematics",
-  "Physics",
-  "Chemistry",
-  "Biology",
   "Computer Science",
   "English",
+  "French",
   "Economics",
+
+  "Python",
+  "PHP",
+  "Node.js",
+  "C",
+  "C++",
+  "C#",
+  "Go",
+  "Dart",
+
+  "HTML",
+  "CSS",
+  "Tailwind CSS",
+
+  "TypeScript",
+  "JavaScript",
+  "React",
+  "Django",
+  "Flutter"
 ];
 
 /* -------------------------------------------------------------------------- */
