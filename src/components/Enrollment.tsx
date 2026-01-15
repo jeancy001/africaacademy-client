@@ -126,8 +126,40 @@ const handlePaymentSuccess = useCallback(
 
       {/* ----------------- ENROLL ----------------- */}
       <div className="w-full md:w-1/3 bg-white p-6 rounded-2xl shadow">
-        <h2 className="text-2xl font-bold text-indigo-700 mb-4">Enroll in a Class</h2>
+         <h2 className="text-2xl font-bold text-indigo-700 mb-4">Enroll in a Class</h2>
+<div className="mb-6 space-y-4 text-sm leading-relaxed text-gray-700">
+  <p>
+    Select the available class you wish to attend in order to enroll.
+    Each class is led by a qualified teacher and focuses on a specific subject.
+  </p>
 
+  <p>
+    To complete your enrollment, you must make the required payment.
+    Once payment is confirmed, you will immediately gain access to your class
+    and begin learning with your assigned teacher.
+  </p>
+
+  <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-800">
+    <p className="font-semibold mb-1">Important Notes for Students:</p>
+    <ul className="list-disc list-inside space-y-1">
+      <li>
+        The first level of your course starts on the same day your payment
+        and enrollment are completed.
+      </li>
+      <li>
+        Each enrollment is linked to one teacher and one subject.
+        You cannot enroll twice with the same teacher.
+      </li>
+      <li>
+        Payments are non-refundable once the class has started.
+      </li>
+      <li>
+        At the end of the training program, you will receive an official
+        certificate if all requirements are met.
+      </li>
+    </ul>
+  </div>
+</div>
         <select
           value={selectedRoom}
           onChange={(e) => {
@@ -176,7 +208,16 @@ const handlePaymentSuccess = useCallback(
         <h2 className="text-2xl font-bold text-indigo-700 mb-4">My Enrolled Classes</h2>
 
         {enrollments.length === 0 ? (
-          <p className="text-gray-500">No enrollments yet.</p>
+          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 py-10 text-center">
+  <p className="text-base font-medium text-gray-700">
+    No enrolled courses yet
+  </p>
+  <p className="max-w-md text-sm text-gray-500">
+    Once you enroll in a course, it will automatically appear here so you can
+    track your progress and continue learning.
+  </p>
+</div>
+
         ) : (
           <ul className="space-y-4">
             {enrollments.map(

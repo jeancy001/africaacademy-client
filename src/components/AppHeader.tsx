@@ -50,7 +50,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-medium hover:bg-indigo-700 transition"
             >
               <Briefcase size={18} />
-              Work as Freelancer
+             Apply Now
             </button>
           )}
 

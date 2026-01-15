@@ -328,9 +328,42 @@ useEffect(() => {
       >
         {!checkout && (
           <>
-            <p className="text-sm text-gray-500 mb-4">
-              Select the subject you want to teach and complete the payment.
-            </p>
+<div className="mb-6 space-y-4 text-sm leading-relaxed text-gray-700">
+  <p className="text-gray-600">
+    Select the subject you wish to teach and complete the one-time subscription
+    payment to get started.
+  </p>
+
+  <p>
+    To become a teacher on our platform, a one-time subscription fee is required.
+    At this stage, teachers work as independent freelancers until the company
+    begins its official hiring process.
+  </p>
+
+  <p>
+    The total subscription fee is{" "}
+    <span className="font-semibold text-gray-900">$50</span>. This is the only
+    payment required. After successful payment, your teacher room or class will
+    be created by the administrator within{" "}
+    <span className="font-medium">24 hours</span>.
+  </p>
+
+  <p>
+    Payments earned from the students you teach will be forwarded directly to
+    you through your{" "}
+    <span className="font-medium">PayPal account or bank account</span>, based on
+    your selected payout method.
+  </p>
+
+  <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4 text-indigo-800">
+    <p className="font-semibold mb-1">Important Notice:</p>
+    <p>
+      Okapi Junior Academia will begin officially hiring teachers soon. Once
+      hiring starts, updated contracts and payment structures will be
+      communicated to all active teachers.
+    </p>
+  </div>
+</div>
 
             <div className="grid grid-cols-2 gap-3">
               {SUBJECTS.map((s) => (
