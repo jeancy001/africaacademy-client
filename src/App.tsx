@@ -10,6 +10,7 @@ import { Studentdash } from "./dash/students/StudentDash";
 import Enrollment from "./components/Enrollment";
 import AdvertHeader from "./app/AdvertHeader";
 import { Progressions } from "./components/Progression";
+import FooterPage from "./app/FooterPage";
 
 function App() {
   const { user,token } = useAuth();
@@ -53,6 +54,7 @@ function App() {
        <Route path="/studentdash" element={  <ProtectedRoute> <Studentdash/> </ProtectedRoute>} />
     </Routes>
 
+     <FooterPage/>
         </>
   );
 }
