@@ -204,16 +204,102 @@ const handleLoginSubmit = async (e: React.FormEvent) => {
   return (
     <div className="min-h-screen flex flex-col md:flex-row items-center justify-center bg-gray-100 p-4">
       {/* Logo + Description */}
-      <div className="flex flex-col items-center md:items-start mb-6 md:mb-0 md:mr-10">
-        <img src="/new_logo.png" alt="BrightAfrica Academy" className="w-32 h-32 mb-4" />
-        <h1 className="text-3xl font-bold text-gray-800">Okapi Junior Academia</h1>
-        <p className="text-gray-600 mt-2 text-center md:text-left max-w-xs">
-          Rejoignez notre communauté d'apprentissage et développez vos compétences numériques à travers l'Afrique.
-        </p>
-      </div>
+<div className="w-full bg-gradient-to-br from-indigo-100 via-sky-100 to-blue-100 py-16 px-8 md:px-24 rounded-3xl mr-4 mb-5 shadow-2xl flex flex-col md:flex-row items-center md:items-start gap-12">
+
+  {/* LEFT: Logo + Content */}
+  <div className="flex flex-col items-center md:items-start text-center md:text-left gap-6 max-w-lg animate-fadeInSlide">
+
+    {/* Logo */}
+    <div className="flex-shrink-0 flex items-center justify-center w-44 h-44 rounded-3xl bg-gradient-to-tr from-indigo-200 to-blue-200 shadow-xl transition-transform duration-500 hover:scale-105">
+      <img
+        src="/new_logo.png"
+        alt="Okapi Junior Academia logo"
+        className="w-36 h-36 object-contain"
+      />
+    </div>
+
+    {/* Academy Name */}
+    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-snug">
+      Okapi Junior Academia
+    </h1>
+
+    {/* Tagline */}
+    <p className="text-indigo-600 font-semibold uppercase text-sm md:text-base tracking-wide">
+      Learn • Create • Succeed
+    </p>
+
+    {/* Description */}
+    <p className="text-gray-700 text-base md:text-lg leading-relaxed">
+      Okapi Junior Academia is a modern learning platform for children and young learners. We provide high-quality education in languages, coding, and digital skills through engaging and age-appropriate programs.
+    </p>
+
+    {/* Additional Features */}
+    <ul className="mt-3 space-y-2 text-gray-600 text-sm md:text-base list-disc list-inside">
+      <li>French & English language programs</li>
+      <li>Beginner-friendly programming courses</li>
+      <li>Led by certified and caring instructors</li>
+      <li>Designed to build confidence and academic excellence</li>
+      <li>Fun, interactive learning environment</li>
+    </ul>
+
+    {/* CTA BUTTONS */}
+    <div className="mt-6 flex flex-col sm:flex-row gap-4">
+      <a
+        href="/enroll"
+        className="flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:bg-indigo-700 hover:shadow-xl transition-all duration-300"
+      >
+        Enroll Now
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </a>
+
+      <a
+        href="/courses"
+        className="flex items-center gap-3 px-6 py-3 bg-white border-2 border-indigo-600 text-indigo-600 font-semibold rounded-xl shadow hover:bg-indigo-50 hover:shadow-md transition-all duration-300"
+      >
+        Browse Courses
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  {/* RIGHT: Reserved space for illustration / graphic */}
+  <div className="flex-1 h-64 md:h-auto bg-gradient-to-tr from-blue-50 to-sky-50 rounded-xl shadow-inner"></div>
+
+</div>
+
+{/* Add animation via Tailwind + custom styles */}
+<style>
+  {`
+    @keyframes fadeInSlide {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeInSlide {
+      animation: fadeInSlide 0.8s ease-out forwards;
+    }
+  `}
+</style>
+
+
 
       {/* Auth Form */}
-      <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8">
+<div className="max-w-md w-full bg-gradient-to-br from-indigo-50 via-sky-50 to-blue-50 shadow-lg rounded-lg p-8 ml-4">
         {/* Tabs */}
         <div className="flex justify-center mb-6 space-x-4">
           <button
